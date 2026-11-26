@@ -1,12 +1,13 @@
+import os
 import pandas as pd
 import sqlalchemy, pymysql, psycopg2
 from sqlalchemy import create_engine
 
 azure_engine = create_engine(
-    "mysql+pymysql://zishaan:VS9eo23cKASvhQ@sra.mysql.database.azure.com:3306/source"
+    f"mysql+pymysql://{os.environ['azure_username']}:{os.environ['azure_password']}@{os.environ['azure_server']}/source"
 )
 pg_engine = sqlalchemy.create_engine(
-    "postgresql+psycopg2://optionsDB:z1sh0PT10Neleph%40ntSQL@34.150.156.184:5432/optionsDB"
+    f"postgresql+psycopg2://{os.environ['gcp_username']}:{os.environ['gcp_password']}@{os.environ['gcp_server']}/optionsDB"
 )
 
 table_list = ['av_minute', 'av_minute_depr', 'iqfeed_minute', 'quantquote_minute']

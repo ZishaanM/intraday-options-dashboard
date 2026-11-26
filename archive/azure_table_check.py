@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import sqlalchemy, pymysql, psycopg2
 from sqlalchemy import create_engine
@@ -8,7 +9,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 
 azure_engine = create_engine(
-    "mysql+pymysql://zishaan:VS9eo23cKASvhQ@sra.mysql.database.azure.com:3306/source"
+    f"mysql+pymysql://{os.environ['azure_username']}:{os.environ['azure_password']}@{os.environ['azure_server']}/source"
 )
 
 table = 'quantquote_minute'

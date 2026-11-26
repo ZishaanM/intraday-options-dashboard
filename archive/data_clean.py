@@ -1,8 +1,9 @@
+import os
 from sqlalchemy import create_engine
 import pandas as pd
 
 pg_engine = create_engine(
-    "postgresql+psycopg2://optionsDB:z1sh0PT10Neleph%40ntSQL@34.150.156.184:5432/optionsDB"
+    f"postgresql+psycopg2://{os.environ['gcp_username']}:{os.environ['gcp_password']}@{os.environ['gcp_server']}/optionsDB"
 )
 
 # Specify your table name and the relevant columns
