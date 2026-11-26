@@ -390,7 +390,7 @@ if __name__ == "__main__":
         print("=" * 60)
         print(f"SIMILARITY ANALYSIS FOR {ticker}")
         print("=" * 60)
-        print(f"Reference Date: {reference_date} at {time}")
+        print(f"Reference Date: {reference_date} at {reference_time}")
         print(f"Similar Historical Patterns Found: {len(similar_history)}")
         print()
         

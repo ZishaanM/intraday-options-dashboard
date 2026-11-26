@@ -85,6 +85,7 @@ def init_logging(logger, log_file='main.log', central_error_log='cron.log'):
         logger.addHandler(consoleHandler)
        
         # Script-specific file handler
+        os.makedirs('log', exist_ok=True)
         fileHandler = logging.handlers.RotatingFileHandler(
             os.path.join('log',log_file),
             maxBytes=1 * 1024 * 1024,
@@ -132,8 +133,6 @@ def connect_gcp():
     username = os.getenv('gcp_username')
     userpwd = os.getenv('gcp_password')
     server = os.getenv('gcp_server')
-    #server = '67.172.197.116:5432'
-    #server = '34.150.156.184:5432'
 
     con = {}
     db = 'optionsDB'
