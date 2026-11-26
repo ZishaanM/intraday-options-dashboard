@@ -1,167 +1,109 @@
-# Options Dashboard
+# Intraday Options Dashboard
 
-An intraday options analysis and prediction dashboard that combines historical pattern matching with Black-Scholes pricing to generate real-time trading recommendations.
+A Streamlit app that finds past trading days whose intraday path matches today's, forecasts the move to the close from those days, and scores same-day option strikes with Black-Scholes against that forecast.
 
-## Purpose & Motivation
+**For reviewers:** Python · Streamlit · Plotly · pandas / NumPy / SciPy · solo · [screenshots](Dash-pics/)
 
-I asked my mentor about a project that would let me explore the intersection of data science, computer science, and quantitative finance. He proposed to me the project and the following hypothesis: **can intraday price patterns predict end-of-day returns?** I wanted to build a tool that could analyze real market data and produce actionable insights.
+![Dashboard home tab: SPY intraday path with predicted close and confidence bands](Dash-pics/Screenshot%202025-12-30%20192651.png)
 
-## The Problem
+## Problem
 
-Traditional options pricing models don't account for intraday market dynamics. Meanwhile, traders often rely on intuition when deciding whether to buy or sell options during the trading day. Options tools calculate theoretical prices but don't contextualize them against likely price movements
+A theoretical option price doesn't tell you whether a strike's break-even is reachable today. The project tests a mentor's hypothesis: can the shape of a day so far (its moves from the open, the prior close, and the intraday high and low) say something useful about where it will close? It then turns that forecast into a per-strike buy/no-buy signal.
 
-## My solution
+## Approach
 
- A dashboard that finds historically similar trading days, predicts where the stock will close, and uses those predictions to recommend whether specific options are worth buying—all updated in real-time.
+- **Similarity search, not a fitted model.** `find_sim_history` in `main.py` takes the reference bar's four features (`ret_from_open`, `ret_from_p_close`, `ret_from_high`, `ret_from_low`). It keeps historical bars at the same clock time where every feature is within a threshold, ranks them by the sum of absolute differences, and keeps the top 100. The threshold starts at 0.001 and widens by 0.001 until at least 30 matches are found. Fixing the time of day keeps the comparison like-for-like (a +1% move at 10:00 is not a +1% move at 15:30).
+- **Forecast with uncertainty.** `pred_ret` takes the mean and standard deviation of the matches' `ret_to_close` and builds a normal 95% confidence interval. The UI converts these into a predicted close price, a 95% band, and a 1σ band.
+- **Same-day option scoring.** `black_scholes_price` is a hand-written European pricer that measures time to expiry in trading hours (year = 252 × 6.5 h), so a noon-to-close expiry is priced correctly. For a ladder of 15 strikes ($2.50 apart, starting about $10 below spot), the tables compare each option's break-even to the forecast bands and label it **STRONG YES / Yes / No / STRONG NO**. The advanced table adds Delta, Gamma, and probability ITM.
+- **Replay, not live.** `config.py` pins a reference date and time (default 2010-06-08 at 12:00), and the app replays that moment from local data. Data started in a PostgreSQL warehouse and was later exported to Parquet so the dashboard runs offline.
 
-## My Approach
+**Simplifications to know about:** volatility is a constant (`implied_vol()` returns 0.32161) and the risk-free rate is a constant 3.961%. The advanced table's **Bid / Ask / Volume columns are placeholders** (literally `"Fake"`), not market quotes. No option-chain data is used anywhere.
 
-### 1. Historical Pattern Matching
-I implemented a similarity search algorithm that finds historical trading days with matching intraday return profiles:
-- Return from market open
-- Return from previous close  
-- Return from intraday high/low
-- Time of Day
+## How to run
 
-The algorithm uses an adaptive threshold—starting strict and relaxing until it finds 30-100 similar patterns.
+### Prerequisites
 
-### 2. Statistical Prediction
-From similar historical days, I calculate:
-- Mean expected return to close
-- 95% confidence interval using normal distribution
-- Standard deviation for 1-sigma bounds
+- Python 3 (tested on 3.12)
+- `returns.parquet` in the repo root. It is gitignored and not published, so you have to bring your own (see [Getting `returns.parquet`](#getting-returnsparquet)).
 
-### 3. Options Pricing Integration
-Using Black-Scholes (adjusted for intraday time-to-expiration), I calculate theoretical option prices and compare break-even points against the predicted price range to generate buy/sell signals.
+### Install
 
-## Technical Choices
-
-| Technology | Why I Chose It |
-|------------|----------------|
-| **Python** | Rich ecosystem for quantitative finance (NumPy, SciPy, Pandas) |
-| **PostgreSQL** | Handles millions of historical price records efficiently with SQL-based similarity queries |
-| **Streamlit** | Rapid prototyping of interactive data apps—allowed me to focus on logic rather than frontend |
-| **Plotly** | Interactive charts essential for financial visualization |
-| **Black-Scholes** | Industry-standard options pricing; implemented from scratch to understand the math |
-
-## Features
-
-- **Real-time Pattern Matching**: Queries 15+ years of historical data to find similar trading days
-- **Confidence Intervals**: 95% CI and 1-sigma bounds for predicted close price
-- **Options Recommendations**: Color-coded buy signals based on break-even analysis
-- **Greeks Calculation**: Delta, Gamma, and Probability ITM computed for each strike
-- **Interactive Dashboard**: Three-tab interface for price charts, predictions, and detailed options tables
-
-## Results
-
-The dashboard successfully:
-- Identifies 30-100 similar historical patterns within seconds
-- Generates predictions with quantified uncertainty (confidence intervals)
-- Produces clear buy/sell recommendations based on statistical edge
-
-
-## Future Improvements
-
-- [ ] Add live market data feed for real-time analysis (currently uses historical reference dates)
-- [ ] Implement implied volatility calculation from actual option prices
-- [ ] Backtest the recommendation system across multiple years
-- [ ] Add more sophisticated similarity metrics (e.g., DTW for pattern matching)
-- [ ] Support for multiple tickers simultaneously
-
----
-
-## Technical Documentation
-
-### Project Structure
-
-```
-options-dash25/
-├── UI.py              # Streamlit dashboard interface
-├── main.py            # Core analysis logic (pattern matching, predictions, Black-Scholes)
-├── config.py          # Configuration (reference date/time)
-├── z_util.py          # Utilities (logging, database connection)
-├── Black_Scholes.py   # Standalone Black-Scholes pricing function
-├── requirements.txt   # Python dependencies
-├── log/               # Application logs
-└── Dash-pics/         # Dashboard screenshots
+```bash
+git clone https://github.com/ZishaanM/intraday-options-dashboard.git
+cd intraday-options-dashboard
+python -m venv venv
+source venv/bin/activate        # Windows: .\venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-### Installation
+### Configure
 
-1. Clone the repository
+Set the moment to replay in `config.py`:
 
-2. Create a virtual environment:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   .\venv\Scripts\activate   # Windows
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   pip install streamlit plotly scipy
-   ```
-
-### Configuration
-
-Set environment variables for database connectivity:
-
-| Variable | Description |
-|----------|-------------|
-| `gcp_username` | PostgreSQL database username |
-| `gcp_password` | PostgreSQL database password |
-| `gcp_server` | Database server address (host:port) |
-
-Edit `config.py` to set the analysis date and time:
 ```python
-reference_date = '20100608'  # Format: YYYYMMDD
-reference_time = 1200        # Format: HHMM (e.g., 1200 = 12:00 PM)
+reference_date = '20100608'  # YYYYMMDD
+reference_time = 1200        # HHMM, 24-hour (1200 = 12:00 PM)
 ```
 
-### Usage
+The dashboard needs no environment variables. Database credentials are only used by the export/ETL scripts (see below).
 
-**Run the Dashboard:**
+### Run
+
 ```bash
-streamlit run UI.py
+streamlit run UI.py     # dashboard at http://localhost:8501
+python main.py          # CLI: matches, forecast, and actual vs predicted for the reference bar
 ```
 
-**Run Analysis from Command Line:**
-```bash
-python main.py
-```
+### Verify
 
-### Key Functions
+- **CLI:** prints the number of similar patterns found, the predicted return to close with its 95% CI, the threshold used, the actual return to close, the prediction error and z-score, whether the actual falls inside the CI, and the five closest historical days.
+- **Dashboard:** a green "Found N similar historical patterns" banner. **Home** shows the reference day's price path up to the reference time, the predicted-close and CI markers at 16:00, and a color-coded strike table (use the Call/Put selector to switch). **Data** shows the forecast numbers next to the actual return to close. **Adv. Table** adds the Greeks.
+- Logs go to `log/<module>.log` (created on first run) and errors also go to `cron.log`.
 
-| Function | Location | Purpose |
-|----------|----------|---------|
-| `find_sim_history()` | main.py | Adaptive pattern matching algorithm |
-| `pred_ret()` | main.py | Statistical prediction with confidence intervals |
-| `black_scholes_price()` | main.py | European option pricing |
-| `calc_table_data()` | main.py | Generate options recommendation table |
-| `calc_advanced_table_data()` | main.py | Detailed table with Greeks |
+### Getting `returns.parquet`
 
-### Database Schema
+The app reads one table, `returns`, with one row per (date, minute) bar:
 
-The application expects a `returns` table:
+| Column | Type | Meaning |
+|--------|------|---------|
+| `date` | int | Trading date, `YYYYMMDD` (e.g. `20100608`) |
+| `time` | int | Bar time, `HHMM` (e.g. `930`, `1200`) |
+| `close` | float | Price at that bar |
+| `ret_from_open` | float | Return from the day's open |
+| `ret_from_p_close` | float | Return from the previous day's close |
+| `ret_from_high` | float | Return from the day's high so far |
+| `ret_from_low` | float | Return from the day's low so far |
+| `ret_to_close` | float | Return from this bar to the day's close (the forecast target) |
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `date` | VARCHAR | Trading date (YYYYMMDD) |
-| `time` | INT | Time of day (HHMM format) |
-| `close` | FLOAT | Price at that time |
-| `ret_from_open` | FLOAT | Return from market open |
-| `ret_from_p_close` | FLOAT | Return from previous close |
-| `ret_from_high` | FLOAT | Return from day's high |
-| `ret_from_low` | FLOAT | Return from day's low |
-| `ret_to_close` | FLOAT | Return to market close |
+You can get it two ways:
 
-### Dependencies
+1. **Export it from the original PostgreSQL warehouse** (only if you have access). Copy `.env.example` to `.env`, fill in the `gcp_*` values, and load them into your shell. In `archive/parquet_conversion_fast.py`, set `START_FROM_TABLE = "returns"` so it skips the large raw minute tables. Run it from the repo root so that `z_util` is importable and the file lands next to `UI.py`:
 
-- pandas >= 2.0.0
-- numpy >= 1.24.0
-- sqlalchemy >= 2.0.0
-- psycopg2-binary >= 2.9.0
-- streamlit
-- plotly
-- scipy
+   ```bash
+   set -a; source .env; set +a
+   PYTHONPATH=. python archive/parquet_conversion_fast.py
+   ```
+
+   The `returns` table was computed inside that warehouse from minute-bar tables copied in from an Azure MySQL source (`archive/python_ETL_ts.py`). The SQL that derives the return columns is not in this repo.
+
+2. **Build your own** from any minute-bar data using the schema above. Write it with `df.to_parquet("returns.parquet")`.
+
+### Gotchas
+
+- **Missing data:** without `returns.parquet`, both entry points fail with "Parquet file not found" / "Make sure the parquet files exist in the script directory".
+- **Types matter:** `date` and `time` must be integers. String dates won't match the reference date and the dashboard stops silently.
+- **The reference bar must exist:** there must be a row exactly at `reference_date` / `reference_time`.
+- **The ticker box is a label only.** The `returns` data has no ticker column, so typing AAPL still analyzes whatever single underlying your parquet contains (the UI defaults to SPY).
+- **Lookahead:** the search runs over the whole dataset, so it can match later dates and the reference day itself. Treat the output as a demo, not a backtest.
+- **Memory:** the full parquet is loaded into memory (cached per process).
+- `activate_options_dash.ps1` activates a venv outside this repo (`..\options_pricer_venv`). Use your own venv instead.
+- `archive/` holds one-off ETL, cleaning, and exploration scripts from the database era. They read credentials from the environment variables in `.env.example` and need extra packages (`archive/requirements.txt`, plus `pymysql` for the Azure scripts).
+
+## What's interesting in the code
+
+- **`main.py` → `find_sim_history` and `pred_ret`:** the whole forecasting idea in about 80 lines. Look at the adaptive threshold loop (widen until at least 30 neighbors, cap at 100) and how a same-clock-time filter plus an L1 ranking stands in for a trained model.
+- **`main.py` → `black_scholes_price` and `calc_advanced_table_data`:** intraday time-to-expiry scaling, Greeks computed from `d1` / `d2`, and the break-even vs. forecast-band rules that turn prices into a recommendation.
+
+## Stack
+
+Python · Streamlit · Plotly · pandas · NumPy · SciPy · PyArrow / Parquet · SQLAlchemy + PostgreSQL (legacy data pipeline)
