@@ -56,7 +56,8 @@ try:
     ref_time = int(reference_time) if isinstance(reference_time, str) else reference_time
     current_day = returns_df[(returns_df['date'] == ref_date) & (returns_df['time'] <= ref_time)].copy()
     
-    if current_day.empty:
+    reference_bar = current_day[current_day['time'] == ref_time]
+    if current_day.empty or reference_bar.empty:
         logger.error("No data found for the reference date and time")
         logger.info(f"Searched for: date='{reference_date}' AND time='{reference_time}'")
         st.stop()
@@ -67,7 +68,7 @@ try:
     logger.info(f"Found {len(current_day)} records for {reference_date} at {reference_time}")
     
     logger.info("Finding similar historical patterns...")
-    similar_history, threshold = find_sim_history(current_day, ticker)
+    similar_history, threshold = find_sim_history(reference_bar, ticker)
     
     if similar_history is not None and not similar_history.empty:
         st.success(f"Found {len(similar_history)} similar historical patterns")
@@ -238,8 +239,8 @@ try:
             st.write(f"**Threshold Used:** {threshold:.4f}")
         
             # Show actual vs predicted if available
-            if 'ret_to_close' in current_day.columns:
-                actual_ret = current_day['ret_to_close'].iloc[0]
+            if 'ret_to_close' in reference_bar.columns:
+                actual_ret = reference_bar['ret_to_close'].iloc[0]
                 st.write(f"**Actual Return to Close:** {actual_ret:.4f} ({actual_ret*100:.2f}%)")
                 st.write(f"**Prediction Error:** {abs(actual_ret - avg_ret):.4f} ({abs(actual_ret - avg_ret)*100:.2f}%)")
     else:
